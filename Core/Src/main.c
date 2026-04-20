@@ -224,12 +224,91 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
 
+static uint8_t Button_ReadRaw(void){
+
+    uint8_t newRawState = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0);
+
+    if (newRawState == GPIO_PIN_SET) {
+   
+        return 1u;
+
+    }
+    else {
+    
+        return 0u;
+
+    }
+
+}
+
+static void Button_Init(Button_t *btn) {
+
+     btn -> rawState = 0u;
+     btn -> lastDebounceChangeTick = 0u;
+
+     btn -> stableState = STABLE_RELEASED;
+     btn -> lastStableState = STABLE_RELEASED;
+
+}
+
+static Button_Status_Event_t Button_Debounce(Button_t* btn, uint32_t now) {
+
+    uint8_t newRawState = Button_ReadRaw();
+
+    if (newRawState != btn->rawState) {
+
+        btn->lastDebounceChangeTick = now;
+
+        btn->rawState = newRawState;
+
+    }
+
+    if (now - btn->lastDebounceChangeTick >= DEBOUNCE_MS) {
+
+        uint8_t newButtonState = btn->rawState;
+
+        if (newButtonState != btn->stableState) {
+
+            btn->lastStableState = btn->stableState;
+
+            btn->stableState = newButtonState;
+
+            if (btn->stableState == 1u) {
+
+                return BUTTON_STATUS_EVENT_STABLE_PRESSED;
+
+            }
+            else {
+
+                return BUTTON_STATUS_EVENT_STABLE_RELEASED;
+            }
+
+
+
+        }
+
+
+
+    }
+
+    return BUTTON_STATUS_EVENT_NONE;
+
+}
 /* USER CODE END 4 */
 
 /**

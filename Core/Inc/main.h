@@ -54,6 +54,8 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -77,6 +79,31 @@ void Error_Handler(void);
 #define SWO_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
+
+#define GPIO_ACTIVE_PIN GPIO_PIN_SET
+#define DEBOUNCE_MS 20u
+
+
+typedef enum {
+
+	BUTTON_STATUS_EVENT_NONE = 0,
+
+	BUTTON_STATUS_EVENT_STABLE_PRESSED,
+
+	BUTTON_STATUS_EVENT_STABLE_RELEASED
+
+}Button_Status_Event_t;
+
+typedef struct {
+
+	uint8_t rawState;
+
+	uint8_t stableState;
+	uint8_t lastStableState;
+
+	uint32_t lastDebounceChangeTick;
+
+}Button_t;
 
 /* USER CODE END Private defines */
 
