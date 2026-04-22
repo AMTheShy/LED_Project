@@ -28,6 +28,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal.h"
+#include <stdint.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -84,13 +85,13 @@ void Error_Handler(void);
 #define DEBOUNCE_MS 20u
 #define LONG_CLICK_DURATION 1500u
 #define DOUBLE_CLICK_WINDOW_DURATION 350u
+#define LED_SLOW_FLASH_PERIOD 1000u
+#define LED_FAST_FLASH_PERIOD 200u
 
 
 typedef enum {
 
-	BUTTON_STATUS_EVENT_NONE = 0,
-
-	BUTTON_STATUS_EVENT_STABLE_PRESSED,
+	BUTTON_STATUS_EVENT_STABLE_PRESSED = 0,
 
 	BUTTON_STATUS_EVENT_STABLE_RELEASED
 
@@ -102,7 +103,9 @@ typedef enum {
 
 	BUTTON_LONG_CLICK,
 
-	BUTTON_DOUBLE_CLICK
+	BUTTON_DOUBLE_CLICK,
+
+	BUTTON_NULL
 
 }Button_Event_t;
 
@@ -129,23 +132,24 @@ typedef struct {
 	uint32_t lastPressEventTick;
 
 	uint8_t longClickFired;
-	uint8_t clickCount;
-	uint8_t waitingForRelease;
 	uint8_t waitingForDoubleClick;
 
 	Button_Status_Event_t stableStatus;
+	Button_Event_t currentButtonEvent;
 
 }Button_t;
 
 typedef struct {
 
 	Led_Task_t ledTask;
+	uint32_t ledSlowFlashTick;
+	uint32_t ledFastFlashTick;
 
 }Led_t;
 
 typedef struct {
 
-	led_t led
+	Led_Task_t ledTask;
 
 }app_t;
 
