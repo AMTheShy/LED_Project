@@ -18,7 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
+#include <stdint.h>
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -258,15 +258,23 @@ static uint8_t Button_ReadRaw(void){
 
 static void Button_Init(Button_t *btn) {
 
-     btn -> rawState = 0u;
-     btn -> lastDebounceChangeTick = 0u;
+     btn->rawState = 0u;
+     btn->lastDebounceChangeTick = 0u;
+     
 
-     btn -> stableState = STABLE_RELEASED;
-     btn -> lastStableState = STABLE_RELEASED;
+     btn->stableState = STABLE_RELEASED;
+     btn->lastStableState = STABLE_RELEASED;
+
+     btn->longCLickFired = 0u;
+     btn->waitingForRelease = 0u;
+     btn->clickCount = 0u;
+     btn->waitingForDoubleClick = 0u;
+
+     btn->stableStatus = BUTTON_STATUS_EVENT_NONE;
 
 }
 
-static Button_Status_Event_t Button_Debounce(Button_t* btn, uint32_t now) {
+static void Button_Debounce(Button_t* btn, uint32_t now) {
 
     uint8_t newRawState = Button_ReadRaw();
 
@@ -278,24 +286,30 @@ static Button_Status_Event_t Button_Debounce(Button_t* btn, uint32_t now) {
 
     }
 
-    if (now - btn->lastDebounceChangeTick >= DEBOUNCE_MS) {
+    if (now - btn->lastDebounceChangeTick > DEBOUNCE_MS) {
 
-        uint8_t newButtonState = btn->rawState;
-
-        if (newButtonState != btn->stableState) {
+        if (newRawState != btn->stableState) {
 
             btn->lastStableState = btn->stableState;
 
-            btn->stableState = newButtonState;
+            btn->stableState = newRawState;
 
             if (btn->stableState == 1u) {
 
-                return BUTTON_STATUS_EVENT_STABLE_PRESSED;
+                btn->rawState = newRawState;
+
+                btn->lastDebounceChangeTick = 0u;
+
+                btn->stableStatus = BUTTON_STATUS_EVENT_STABLE_PRESSED;
 
             }
             else {
 
-                return BUTTON_STATUS_EVENT_STABLE_RELEASED;
+                btn->rawState = newRawState;
+
+                btn->lastDebounceChangeTick = 0u;
+
+                btn->stableStatus = BUTTON_STATUS_EVENT_STABLE_RELEASED;
             }
 
 
@@ -306,7 +320,103 @@ static Button_Status_Event_t Button_Debounce(Button_t* btn, uint32_t now) {
 
     }
 
-    return BUTTON_STATUS_EVENT_NONE;
+}
+
+static Button_Event_t Get_Button_Event(Button_Status_Event_t status,Button_t *btn, uint32_t now) {
+
+    if (status == BUTTON_STATUS_EVENT_STABLE_PRESSED) {
+
+        if (btn->waitingForDoubleClick == 1u) {
+
+            return BUTTON_DOUBLE_CLICK;
+            
+        }else {
+
+            btn->longClickFired = 0u;
+
+            btn->newPressClickTick = now;
+        
+            if (now - newPressClickTick > LONG_CLICK_DURATION) {
+
+                btn->longCLickFired = 1u;
+
+            }
+            else {
+
+                btn->waitingForRelease = 1u;
+
+            }
+        
+        }
+            
+    }
+
+
+
+    if (status == BUTTON_STATUS_EVENT_STABLE_RELEASED) {
+
+        if (waitingForDoubleClick = 1u) {
+
+            if (now - lastPressEventClick >= DOUBLE_CLICK_WINDOW_DURATION) {
+            
+                waitingForDoubleClick = 0u;
+
+                return BUTTON_SHORT_CLICK;
+
+            }
+
+        }
+    
+        if (btn->longClickFired == 1u && btn->waitingForRelease == 1u) {
+        
+            btn->longCLickFired = 0u;
+
+            btn->waitingForRelease = 0u;
+
+            return BUTTON_LONG_CLICK;
+
+        }else if(btn->longClickFired == 0u && btn->waitingForRelease == 1u) {
+
+            btn->waitingForDoubleClick = 1u;
+
+            btn->waitingForRelease = 0u;
+
+            btn->lastPressEventTick = now;
+
+        }
+
+
+        
+     }
+
+    
+    
+}
+
+static void Handle_Button_Event(Button_Event_t event, Led_t *led, uint32_t now) {
+
+    switch (event) {
+    
+    case BUTTON_SHORT_CLICK: 
+
+        led->Mode = 
+
+    case BUTTON_LONG_CLICK:
+
+    case BUTTON_DOUBLE_CLICK:
+    
+    
+    }
+
+
+}
+
+static void Led_task()
+
+
+
+    
+
 
 }
 /* USER CODE END 4 */
