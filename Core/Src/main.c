@@ -54,6 +54,14 @@ static app_t System_App;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+static uint8_t Button_ReadRaw(void);
+static void Button_Init(Button_t* btn);
+static void Led_Init(Led_t* led);
+static void app_Init(app_t* app);
+static void Button_Debounce(Button_t* btn, uint32_t now);
+static void Calculate_Button_Event(Button_t* btn, uint32_t now);
+static void App_Handle_Button_Event(Button_Event_t event,Led_t *led, app_t* app);
+static void Led_task(Led_t* led, uint32_t now);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
@@ -97,7 +105,7 @@ int main(void)
 
   Button_Init(&System_Button);
   Led_Init(&System_Led);
-  app_Init(&System_App, System_Led);
+  app_Init(&System_App);
 
   /* USER CODE END 2 */
 
@@ -113,7 +121,9 @@ int main(void)
 
       Calculate_Button_Event(&System_Button, now);
 
-      App_Handle_Button_Event(System_Button.currentButtonEvent, &System_App);
+      App_Handle_Button_Event(System_Button.currentButtonEvent,&System_Led, &System_App);
+
+      System_Button.currentButtonEvent = BUTTON_NULL;
 
       Led_task(&System_Led, now);
 
@@ -277,17 +287,18 @@ static uint8_t Button_ReadRaw(void){
 static void Button_Init(Button_t *btn) {
 
      btn->rawState = 0u;
-     btn->lastDebounceChangeTick = 0u;
-     
-
      btn->stableState = 0u;
      btn->lastStableState = 0u;
 
-     btn->longCLickFired = 0u;
-     btn->clickCount = 0u;
+     btn->lastDebounceChangeTick = 0u;
+     btn->newPressEventTick = 0u;
+     btn->lastPressEventTick = 0u;
+
+     btn->longClickFired = 0u;
+     btn->doubleClickFired = 0u;
      btn->waitingForDoubleClick = 0u;
 
-     btn->stableStatus = BUTTON_STATUS_EVENT_STABLE_RELEASED;
+     btn->stableStatus = BUTTON_STATUS_EVENT_NONE;
      btn->currentButtonEvent = BUTTON_NULL;
 
 }
@@ -296,21 +307,23 @@ static void Led_Init(Led_t* led) {
 
     led->ledTask = LED_OFF;
 
-    led->ledTaskledSlowFlashTick = 0u;
+    led->ledSlowFlashTick = 0u;
 
-    led->ledTaskledFastFlashTick = 0u;
+    led->ledFastFlashTick = 0u;
 
 }
 
-static void app_Init(app_t* app, Led_t led) {
+static void app_Init(app_t* app) {
 
-    app->ledTask = led.ledTask;
+    app->ledTask = LED_OFF;
  
 }
 
 static void Button_Debounce(Button_t* btn, uint32_t now) {
 
     uint8_t newRawState = Button_ReadRaw();
+
+    btn->stableStatus = BUTTON_STATUS_EVENT_NONE;
 
     if (newRawState != btn->rawState) {
 
@@ -353,65 +366,77 @@ static void Calculate_Button_Event(Button_t *btn, uint32_t now) {
 
     if (btn->stableStatus == BUTTON_STATUS_EVENT_STABLE_PRESSED) {
 
-        if (btn->waitingForDoubleClick) {
+        btn->longClickFired = 0u;
 
+        btn->newPressEventTick = now;
+
+        if (btn->waitingForDoubleClick) {
+        
             btn->waitingForDoubleClick = 0u;
 
+            btn->doubleClickFired = 1u;
+
+            btn->lastPressEventTick = 0u;
+
             btn->currentButtonEvent = BUTTON_DOUBLE_CLICK;
-            
-        }else {     
 
-                if (!btn->longClickFired) {
-                
-                    btn->newPressClickTick = now;
-
-                }
-
-            btn->longClickFired = 1u;
-                    
         }
-            
+   
     }
-
-
 
     if (btn->stableStatus == BUTTON_STATUS_EVENT_STABLE_RELEASED) {
 
-        if (btn->waitingForDoubleClick) {
-
-            if (now - lastPressEventClick >= DOUBLE_CLICK_WINDOW_DURATION) {
-            
-                btn->waitingForDoubleClick = 0u;
-
-                btn->currentButtonEvent = BUTTON_SHORT_CLICK;
-
-            }
-
-        }
-    
-        if (now - btn->newPressClickTick >= LONG_CLICK_DURATION) {
+        if (btn->doubleClickFired) {
         
-            btn->longCLickFired = 0u;
-
-            btn->currentButtonEvent = BUTTON_LONG_CLICK;
-
-        }else {
-
+            btn->doubleClickFired = 0u;
+        
+        }else if(!btn->longClickFired) {
+        
             btn->waitingForDoubleClick = 1u;
-
-            btn->longCLickFired = 0u;
 
             btn->lastPressEventTick = now;
 
         }
-        
-     }
+   
+    }
+
+    if (btn->stableState == 1u) {
+
+        if (!btn->longClickFired && now - btn->newPressEventTick > LONG_CLICK_DURATION) {
+
+            btn->newPressEventTick = 0u;
+
+            btn->longClickFired = 1u;
+
+            btn->currentButtonEvent = BUTTON_LONG_CLICK;
+
+        }
+
+    }
+
+    if (btn->stableState == 0) {
+    
+        if (btn->waitingForDoubleClick && now - btn->lastPressEventTick > DOUBLE_CLICK_WINDOW_DURATION) {
+            
+                btn->waitingForDoubleClick = 0u;
+
+                btn->lastPressEventTick = 0u;
+
+                btn->currentButtonEvent = BUTTON_SHORT_CLICK;  
+
+        }
+    
+    }
+
+    
    
 }
 
-static void App_Handle_Button_Event(Button_Event_t event, app_t *app) {
+static void App_Handle_Button_Event(Button_Event_t event, Led_t *led, app_t *app) {
 
-    Led_Task_t currentLedTask = app->led.ledTask;
+    app->ledTask = led->ledTask;
+
+    Led_Task_t currentLedTask = app->ledTask;
 
     switch (event) {
     
@@ -421,27 +446,26 @@ static void App_Handle_Button_Event(Button_Event_t event, app_t *app) {
         
         case LED_ON :
 
-            app->led.ledTask = LED_SLOW_FLASH;
+            led->ledTask = LED_SLOW_FLASH;
             break;
 
         case LED_SLOW_FLASH:
 
-            app->led.ledTask = LED_FAST_FLASH;
+            led->ledTask = LED_FAST_FLASH;
             break;
 
         case LED_FAST_FLASH:
 
-            app->led.ledTask = LED_OFF;
+            led->ledTask = LED_OFF;
             break;
 
         case LED_OFF:
 
-            app->led.ledTask = LED_ON;
+            led->ledTask = LED_ON;
             break;
 
         default :
 
-            app->led.ledTask = LED_OFF;
             break;
         
         }
@@ -450,19 +474,17 @@ static void App_Handle_Button_Event(Button_Event_t event, app_t *app) {
 
     case BUTTON_LONG_CLICK:
 
-        app->led.ledTask = LED_OFF;
+        led->ledTask = LED_OFF;
 
         break;
 
     case BUTTON_DOUBLE_CLICK:
         
-        app->led.ledTask = LED_FAST_FLASH;
+        led->ledTask = LED_FAST_FLASH;
 
         break;
 
     case BUTTON_NULL:
-
-        app->led.ledTask = LED_OFF;
 
         break;
     
@@ -527,7 +549,7 @@ static void Led_task(Led_t *led, uint32_t now) {
     
 
 
-}
+
 /* USER CODE END 4 */
 
 /**

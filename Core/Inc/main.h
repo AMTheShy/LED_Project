@@ -84,14 +84,16 @@ void Error_Handler(void);
 #define GPIO_ACTIVE_PIN GPIO_PIN_SET
 #define DEBOUNCE_MS 20u
 #define LONG_CLICK_DURATION 1500u
-#define DOUBLE_CLICK_WINDOW_DURATION 350u
-#define LED_SLOW_FLASH_PERIOD 1000u
-#define LED_FAST_FLASH_PERIOD 200u
+#define DOUBLE_CLICK_WINDOW_DURATION 200u
+#define LED_SLOW_FLASH_PERIOD 500u
+#define LED_FAST_FLASH_PERIOD 100u
 
 
 typedef enum {
 
-	BUTTON_STATUS_EVENT_STABLE_PRESSED = 0,
+	BUTTON_STATUS_EVENT_NONE = 0,
+
+	BUTTON_STATUS_EVENT_STABLE_PRESSED,
 
 	BUTTON_STATUS_EVENT_STABLE_RELEASED
 
@@ -129,9 +131,11 @@ typedef struct {
 	uint8_t lastStableState;
 
 	uint32_t lastDebounceChangeTick;
+	uint32_t newPressEventTick;
 	uint32_t lastPressEventTick;
 
 	uint8_t longClickFired;
+	uint8_t doubleClickFired;
 	uint8_t waitingForDoubleClick;
 
 	Button_Status_Event_t stableStatus;
